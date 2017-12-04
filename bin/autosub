@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#coding=utf-8
+import sys
+reload(sys)
+sys.setdefaultencoding( "utf-8" )
 import argparse
 import audioop
 from googleapiclient.discovery import build
@@ -11,12 +15,13 @@ import subprocess
 import sys
 import tempfile
 import wave
-
+import googletrans
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
 from autosub.constants import LANGUAGE_CODES, \
     GOOGLE_SPEECH_API_KEY, GOOGLE_SPEECH_API_URL
 from autosub.formatters import FORMATTERS
+
 
 
 def percentile(arr, percent):
@@ -49,8 +54,7 @@ class FLACConverter(object):
             command = ["ffmpeg","-ss", str(start), "-t", str(end - start),
                        "-y", "-i", self.source_path,
                        "-loglevel", "error", temp.name]
-            use_shell = True if os.name == "nt" else False
-            subprocess.check_output(command, stdin=open(os.devnull), shell=use_shell)
+            subprocess.check_output(command, stdin=open(os.devnull))
             return temp.read()
 
         except KeyboardInterrupt:
@@ -69,10 +73,16 @@ class SpeechRecognizer(object):
             for i in range(self.retries):
                 url = GOOGLE_SPEECH_API_URL.format(lang=self.language, key=self.api_key)
                 headers = {"Content-Type": "audio/x-flac; rate=%d" % self.rate}
-
+                proxies = {
+  'http' : 'http://127.0.0.1:8887',
+  'https': 'https://127.0.0.1:8887'
+}
                 try:
-                    resp = requests.post(url, data=data, headers=headers)
+                    resp = requests.post(url, data=data, headers=headers,proxies=proxies)
+                    #print resp
+				    #uncomment if you want to test the network               
                 except requests.exceptions.ConnectionError:
+                    #print "connect failed"
                     continue
 
                 for line in resp.content.split("\n"):
@@ -91,24 +101,18 @@ class SpeechRecognizer(object):
 class Translator(object):
     def __init__(self, language, api_key, src, dst):
         self.language = language
-        self.api_key = api_key
-        self.service = build('translate', 'v2',
-                             developerKey=self.api_key)
+        #self.api_key = api_key
+        #self.service = build('translate', 'v2',
+        #                     developerKey=self.api_key)
         self.src = src
         self.dst = dst
-
+        proxiess = {  'http' : 'http://127.0.0.1:8887',  'https': 'https://127.0.0.1:8887'}
+        self.pytranslator=googletrans.Translator(proxies=proxiess)
     def __call__(self, sentence):
         try:
             if not sentence: return
-            result = self.service.translations().list(
-                source=self.src,
-                target=self.dst,
-                q=[sentence]
-            ).execute()
-            if 'translations' in result and len(result['translations']) and \
-                            'translatedText' in result['translations'][0]:
-                return result['translations'][0]['translatedText']
-            return ""
+            return self.pytranslator.translate(sentence,src=self.src,dest=self.dst).text
+            
 
         except KeyboardInterrupt:
             return
@@ -140,8 +144,7 @@ def extract_audio(filename, channels=1, rate=16000):
         print "ffmpeg: Executable not found on machine."
         raise Exception("Dependency not found: ffmpeg")
     command = ["ffmpeg", "-y", "-i", filename, "-ac", str(channels), "-ar", str(rate), "-loglevel", "error", temp.name]
-    use_shell = True if os.name == "nt" else False
-    subprocess.check_output(command, stdin=open(os.devnull), shell=use_shell)
+    subprocess.check_output(command, stdin=open(os.devnull))
     return temp.name, rate
 
 
@@ -150,9 +153,11 @@ def find_speech_regions(filename, frame_width=4096, min_region_size=0.5, max_reg
     sample_width = reader.getsampwidth()
     rate = reader.getframerate()
     n_channels = reader.getnchannels()
+
+    total_duration = reader.getnframes() / rate
     chunk_duration = float(frame_width) / rate
 
-    n_chunks = int(math.ceil(reader.getnframes()*1.0 / frame_width))
+    n_chunks = int(total_duration / chunk_duration)
     energies = []
 
     for i in range(n_chunks):
@@ -230,7 +235,8 @@ def main():
     audio_filename, audio_rate = extract_audio(args.source_path)
 
     regions = find_speech_regions(audio_filename)
-
+    #print regions
+    #uncomment it if you want to see the region slices
     pool = multiprocessing.Pool(args.concurrency)
     converter = FLACConverter(source_path=audio_filename)
     recognizer = SpeechRecognizer(language=args.src_language, rate=audio_rate, api_key=GOOGLE_SPEECH_API_KEY)
@@ -248,17 +254,19 @@ def main():
 
             widgets = ["Performing speech recognition: ", Percentage(), ' ', Bar(), ' ', ETA()]
             pbar = ProgressBar(widgets=widgets, maxval=len(regions)).start()
-
+            
             for i, transcript in enumerate(pool.imap(recognizer, extracted_regions)):
                 transcripts.append(transcript)
                 pbar.update(i)
             pbar.finish()
 
             if not is_same_language(args.src_language, args.dst_language):
-                if args.api_key:
-                    google_translate_api_key = args.api_key
+                if True:
+                    google_translate_api_key = None
+                    #we don't to need api key compared to origin method
                     translator = Translator(args.dst_language, google_translate_api_key, dst=args.dst_language,
-                                            src=args.src_language)
+                                           src=args.src_language)
+
                     prompt = "Translating from {0} to {1}: ".format(args.src_language, args.dst_language)
                     widgets = [prompt, Percentage(), ' ', Bar(), ' ', ETA()]
                     pbar = ProgressBar(widgets=widgets, maxval=len(regions)).start()
@@ -295,6 +303,7 @@ def main():
 
     print "Subtitles file created at {}".format(dest)
 
+    #print audio_filename
     os.remove(audio_filename)
 
     return 0
