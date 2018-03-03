@@ -6,7 +6,7 @@
 
 Autosub is a utility for automatic speech recognition and subtitle generation. It takes a video or an audio file as input, performs voice activity detection to find speech regions, makes parallel requests to Google Web Speech API to generate transcriptions for those regions, (optionally) translates them to a different language, and finally saves the resulting subtitles to disk. It supports a variety of input and output languages (to see which, run the utility with the argument `--list-languages`) and can currently produce subtitles in either the SRT format or simple JSON. 
 
-The origin reposity is unable to run because of the google speech api is unable to reach and the google translate api is not free. I implement a version that uses shadowsocks as agent and send post request using the agent in the code. For google translate api, I use the thought of py-googletrans reposity based on ajax tech.
+The origin reposity is unable to run because of the google speech api is unable to reach and the google translate api is not free. I implement a version that uses shadowsocks as agent and send post request using the agent in the code. For google translate api, I use the thought of py-googletrans repository based on ajax tech.
 
 ### Prerequisite
 
