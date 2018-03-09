@@ -36,7 +36,11 @@ The origin reposity is unable to run because of the google speech api is unable 
 
 Note that your shadowsocks port should be the same with proxies in the code. (In this code it's 8887)
 
-3 install autosub
+3 install googletrans
+
+    sudo pip install googletrans
+
+4 install autosub
 
     git clone https://github.com/crh19970307/autosub.git
     cd autosub
