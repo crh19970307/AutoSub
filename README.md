@@ -38,6 +38,12 @@ Note that your shadowsocks port should be the same with proxies in the code. (In
 
 3 install googletrans
 
+    git clone https://github.com/ssut/py-googletrans.git
+    cd py-googletrans
+    sudo python setup.py install
+    
+**Note that the version of googletrans in pypi doesn't support proxy, so the command below doesn't work. **
+
     sudo pip install googletrans
 
 4 install autosub
