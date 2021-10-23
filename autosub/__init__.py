@@ -17,6 +17,8 @@ import tempfile
 import wave
 import json
 import requests
+import googletrans
+
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
@@ -148,6 +150,22 @@ class Translator(object): # pylint: disable=too-few-public-methods
         except KeyboardInterrupt:
             return None
 
+class MyTranslator(object): # pylint: disable=too-few-public-methods
+    """
+    Class for translating a sentence from a one language to another.
+    """
+    def __init__(self, language, api_key, src, dst):
+        # self.language = language
+        # self.api_key = api_key
+        # self.service = build('translate', 'v2',
+        #                      developerKey=self.api_key)
+        self.src = src
+        self.dst = dst
+        self.pytranslator=googletrans.Translator()
+
+    def __call__(self, sentence):
+        return self.pytranslator.translate(sentence,src=self.src,dest=self.dst).text        
+
 
 def which(program):
     """
@@ -245,6 +263,7 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
     audio_filename, audio_rate = extract_audio(source_path)
 
     regions = find_speech_regions(audio_filename)
+    print(f"find {len(regions)} regions")
 
     pool = multiprocessing.Pool(concurrency)
     converter = FLACConverter(source_path=audio_filename)
@@ -287,6 +306,19 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
                     pbar.finish()
                     transcripts = translated_transcripts
                 else:
+                    # google_translate_api_key = api_key
+                    # translator = Translator(dst_language, google_translate_api_key,
+                    #                         dst=dst_language,
+                    #                         src=src_language)
+                    # prompt = "Translating from {0} to {1}: ".format(src_language, dst_language)
+                    # widgets = [prompt, Percentage(), ' ', Bar(), ' ', ETA()]
+                    # pbar = ProgressBar(widgets=widgets, maxval=len(regions)).start()
+                    # translated_transcripts = []
+                    # for i, transcript in enumerate(pool.imap(translator, transcripts)):
+                    #     translated_transcripts.append(transcript)
+                    #     pbar.update(i)
+                    # pbar.finish()
+                    # transcripts = translated_transcripts
                     print(
                         "Error: Subtitle translation requires specified Google Translate API key. "
                         "See --help for further information."
@@ -311,6 +343,10 @@ def generate_subtitles( # pylint: disable=too-many-locals,too-many-arguments
         dest = "{base}.{format}".format(base=base, format=subtitle_file_format)
 
     with open(dest, 'wb') as output_file:
+        output_file.write(formatted_subtitles.encode("utf-8"))
+
+    with open(dest+".txt", 'wb') as output_file:
+        formatted_subtitles =  '\n'.join(formatted_subtitles.split('\n')[2::4])
         output_file.write(formatted_subtitles.encode("utf-8"))
 
     os.remove(audio_filename)
